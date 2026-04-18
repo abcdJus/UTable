@@ -2,6 +2,7 @@ const BACKEND_ORIGIN = (process.env.NETLIFY_BACKEND_ORIGIN || '').replace(/\/+$/
 
 function buildForwardHeaders(request) {
   const headers = new Headers(request.headers);
+  headers.delete('accept-encoding');
   headers.delete('content-length');
   headers.delete('host');
   headers.delete('x-forwarded-for');
@@ -40,8 +41,13 @@ async function proxyToBackend(request) {
 
   const upstreamResponse = await fetch(targetUrl, init);
   const responseHeaders = new Headers(upstreamResponse.headers);
+  responseHeaders.delete('connection');
+  responseHeaders.delete('content-encoding');
+  responseHeaders.delete('content-length');
+  responseHeaders.delete('transfer-encoding');
+  const responseBody = method === 'HEAD' ? null : await upstreamResponse.arrayBuffer();
 
-  return new Response(upstreamResponse.body, {
+  return new Response(responseBody, {
     status: upstreamResponse.status,
     statusText: upstreamResponse.statusText,
     headers: responseHeaders,

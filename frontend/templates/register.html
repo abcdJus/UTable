@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Register</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+
+<body class="auth-page">
+<div class="auth-shell">
+    <div class="auth-card">
+    <button type="button" onclick="window.location.href='/login'" class="secondary-button secondary-button--compact auth-back-button">
+        Back to Login
+    </button>
+    <h2 class="auth-title">Thank you for Registering</h2>
+    <p class="auth-subtitle">Please provide the following information to register:</p>
+    {% if message %}
+        <p class="auth-message {% if message_type == 'success' %}auth-message--success{% else %}auth-message--error{% endif %}">{{ message }}</p>
+    {% endif %}
+    <form id="register" action="/register" method="post" class="auth-form">
+        <div class="form-field">
+            <label for="username" class="form-label">Username</label>
+            <input type="text" id="username" name="username" placeholder="bob@gmail.com" required class="text-input">
+        </div>
+        <div class="form-field">
+            <label for="password" class="form-label">Password</label>
+            <input type="password" id="password" name="password" placeholder="Enter password" required class="text-input">
+        </div>
+        <div class="form-field">
+            <label for="confirm_password" class="form-label">Confirm Password</label>
+            <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm password" required class="text-input">
+        </div>
+
+        <button type="submit" class="primary-button primary-button--wide">
+          Register
+        </button>
+    </form>
+</div>
+</div>
+
+</body>
+</html>

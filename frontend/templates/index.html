@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>University Timetable Builder</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <script src= "{{ url_for('static', filename='js/config.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/models.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/storage.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/scheduler.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/ui.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/events.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+  </head>
+  <body class="builder-page">
+    <div class="builder-shell">
+      <aside class="builder-sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-brand">
+            <h1 class="sidebar-title">Timetable Builder</h1>
+            <p class="sidebar-subtitle">
+              Plan a clean, conflict-free semester schedule
+            </p>
+          </div>
+        <button
+          id="logout-btn"
+          type="button"
+          class="secondary-button secondary-button--compact"
+        >
+          Logout
+        </button>
+        </div>
+
+        <div class="sidebar-content">
+        <div class="course-search-shell">
+          <form id="add-course-form" class="course-form">
+            <input
+              type="text"
+              id="course-code-input"
+              placeholder="Course Code (e.g. CSCB20H3)"
+              class="text-input course-form__input"
+              autocomplete="off"
+              aria-autocomplete="list"
+              aria-controls="course-suggestions"
+              aria-expanded="false"
+              required
+            />
+            <button
+              type="submit"
+              class="primary-button primary-button--compact"
+              title="Add course"
+            >
+              Add
+            </button>
+          </form>
+
+          <div
+            id="course-suggestions"
+            class="course-suggestions is-hidden"
+            role="listbox"
+            aria-label="Course suggestions"
+          ></div>
+        </div>
+
+        <p
+          id="course-search-status"
+          class="status-note status-note--warning is-hidden"
+        ></p>
+
+        <div
+          id="course-term-picker"
+          class="course-term-picker is-hidden"
+        ></div>
+
+        <div class="summary-grid">
+          <div class="summary-card">
+            <div class="summary-card__label">Courses</div>
+            <div id="course-count" class="summary-card__value">
+              0
+            </div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-card__label">Sections</div>
+            <div id="section-count" class="summary-card__value">
+              0
+            </div>
+          </div>
+        </div>
+
+        <div id="course-list" class="course-list"></div>
+        </div>
+
+        <div class="sidebar-footer">
+        <p
+          id="generate-help"
+          class="status-note status-note--warning is-hidden"
+        ></p>
+        <button
+          id="generate-btn"
+          class="primary-button primary-button--wide"
+        >
+          Generate Timetables
+        </button>
+
+        <button
+          id="reset-btn"
+          class="secondary-button secondary-button--wide"
+        >
+          Load Sample Data
+        </button>
+        </div>
+      </aside>
+
+      <main class="builder-main">
+      <div
+        id="empty-state"
+        class="empty-state"
+      >
+        <h2 class="empty-state__title">Ready to plan?</h2>
+        <p class="empty-state__text">
+          Add your courses and their available section choices in the sidebar.
+          When you're ready, generate all conflict-free timetable combinations.
+        </p>
+      </div>
+
+      <div
+        id="results-state"
+        class="results-panel is-hidden"
+      >
+        <div class="results-toolbar">
+          <div class="results-toolbar__group">
+            <div
+              id="pagination-controls"
+              class="pager"
+            >
+              <button
+                id="prev-btn"
+                class="pager__button"
+              >
+                Prev
+              </button>
+              <span id="pagination-text" class="pager__text"
+                >Option 0 of 0</span
+              >
+              <button
+                id="next-btn"
+                class="pager__button"
+              >
+                Next
+              </button>
+            </div>
+
+            <div
+              id="term-tabs"
+              class="term-tabs is-hidden"
+            ></div>
+
+            <div
+              id="schedule-stats"
+              class="results-stats is-hidden"
+            >
+              <span class="results-stat"><span id="stat-days">0</span> days</span>
+              <span class="results-stat">Starts <span id="stat-start">0:00</span></span>
+              <span class="results-stat">Ends <span id="stat-end">0:00</span></span>
+            </div>
+
+            <div
+              id="error-state"
+              class="results-error is-hidden"
+            >
+              No conflict-free
+              schedules possible.
+            </div>
+
+            <div
+              id="term-empty-state"
+              class="results-error is-hidden"
+            ></div>
+          </div>
+
+          <div id="sort-controls" class="sort-panel">
+            <span class="sort-panel__label">Sort by</span>
+            <div class="sort-panel__field">
+              <select
+                id="sort-select"
+                class="sort-select"
+              >
+                <option value="default">Default order</option>
+                <option value="fewer-days">Fewer days on campus</option>
+                <option value="earliest-finish">Earliest finish</option>
+                <option value="latest-start">Latest start</option>
+                <option value="compact">Most compact</option>
+              </select>
+              <span class="sort-select-arrow" aria-hidden="true">v</span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          id="timetable-container"
+          class="timetable-scroll"
+        >
+          <div class="timetable-shell">
+            <div class="timetable-day-header-row">
+              <div class="timetable-day-header">Mon</div>
+              <div class="timetable-day-header">Tue</div>
+              <div class="timetable-day-header">Wed</div>
+              <div class="timetable-day-header">Thu</div>
+              <div class="timetable-day-header">Fri</div>
+            </div>
+
+            <div class="timetable-grid">
+              <div id="grid-rows" class="timetable-grid-background"></div>
+              <div
+                id="grid-columns"
+                class="timetable-grid-columns"
+              ></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </main>
+    </div>
+  </body>
+</html>

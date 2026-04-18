@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Login</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+
+<body class="auth-page">
+<div class="auth-shell">
+    <div class="auth-card">
+    <h2 class="auth-title">Welcome to Timetable Builder</h2>
+    <p class="auth-subtitle">Please log in to continue</p>
+    {% if message %}
+        <p class="auth-message {% if message_type == 'success' %}auth-message--success{% else %}auth-message--error{% endif %}">{{ message }}</p>
+    {% endif %}
+
+    <form id="login" action="/login" method="post" class="auth-form">
+        <div class="form-field">
+            <label for="username" class="form-label">Username</label>
+            <input type="text" id="username" name="username" placeholder="bob@gmail.com" required class="text-input">
+        </div>
+        <div class="form-field">
+            <label for="password" class="form-label">Password</label>
+            <input type="password" id="password" name="password" placeholder="Enter password" required class="text-input">
+        </div>
+        <button type="submit" class="primary-button primary-button--wide">
+          Log In
+        </button>
+    </form>
+
+    <div class="auth-divider">
+        <div class="auth-divider__line"></div>
+        <span class="auth-divider__label">New to Timetable?</span>
+        <div class="auth-divider__line"></div>
+    </div>
+
+    <div class="auth-footer">
+      <p class="auth-footer__text">Don't have an account?</p>
+      <button type="button" onclick="window.location.href='/register'" class="secondary-button secondary-button--compact">
+        Register Here
+      </button>
+    </div>
+</div>
+</div>
+
+</body>
+</html>

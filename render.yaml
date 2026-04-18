@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: utable-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    autoDeployTrigger: commit
+    plan: free
+    healthCheckPath: /health
+    # After your first deploy, add your real custom domain here if you want to
+    # manage it from code as well:
+    # domains:
+    #   - yourdomain.com
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: false
+      - key: SESSION_COOKIE_SECURE
+        value: true
+      - key: SESSION_COOKIE_SAMESITE
+        value: Lax
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: utable-db
+          property: connectionString
+
+databases:
+  - name: utable-db
+    databaseName: utable
+    plan: free
+    ipAllowList: []

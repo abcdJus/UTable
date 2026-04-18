@@ -4,3 +4,37 @@
 [functions]
   directory = "netlify/functions"
 
+[[redirects]]
+  from = "/"
+  to = "/.netlify/functions/backend-proxy"
+  status = 200
+
+[[redirects]]
+  from = "/health"
+  to = "/.netlify/functions/backend-proxy"
+  status = 200
+
+[[redirects]]
+  from = "/login"
+  to = "/.netlify/functions/backend-proxy"
+  status = 200
+
+[[redirects]]
+  from = "/register"
+  to = "/.netlify/functions/backend-proxy"
+  status = 200
+
+[[redirects]]
+  from = "/index"
+  to = "/.netlify/functions/backend-proxy"
+  status = 200
+
+[[redirects]]
+  from = "/logout"
+  to = "/.netlify/functions/backend-proxy"
+  status = 200
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/backend-proxy"
+  status = 200

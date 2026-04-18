@@ -216,6 +216,18 @@ def get_db_connection():
     return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 
+def get_table_columns(conn, table_name):
+    rows = conn.execute(
+        '''
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = %s
+        ''',
+        (table_name,),
+    ).fetchall()
+    return {row['column_name'] for row in rows}
+
+
 # Create the tables the app needs if they do not already exist.
 def init_db():
     conn = get_db_connection()
@@ -258,12 +270,21 @@ def init_db():
                 section_id INTEGER NOT NULL,
                 term TEXT NOT NULL DEFAULT 'Fall',
                 day TEXT NOT NULL,
-                start TEXT NOT NULL,
-                end TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
                 FOREIGN KEY (section_id) REFERENCES sections(id) ON DELETE CASCADE
             )
             '''
         )
+        meeting_columns = get_table_columns(conn, 'meetings')
+        if 'start' in meeting_columns and 'start_time' not in meeting_columns:
+            conn.execute('ALTER TABLE meetings RENAME COLUMN "start" TO start_time')
+            meeting_columns.discard('start')
+            meeting_columns.add('start_time')
+        if 'end' in meeting_columns and 'end_time' not in meeting_columns:
+            conn.execute('ALTER TABLE meetings RENAME COLUMN "end" TO end_time')
+            meeting_columns.discard('end')
+            meeting_columns.add('end_time')
         conn.execute(
             'CREATE INDEX IF NOT EXISTS idx_courses_user_id ON courses (user_id)'
         )
@@ -1127,7 +1148,7 @@ def save_courses():
             section_id = section_row['id']
             for meeting in section.get('meetings', []):
                 conn.execute(
-                    'INSERT INTO meetings (section_id, term, day, start, end) VALUES (%s, %s, %s, %s, %s)',
+                    'INSERT INTO meetings (section_id, term, day, start_time, end_time) VALUES (%s, %s, %s, %s, %s)',
                     (
                         section_id,
                         normalize_term_value(meeting.get('term'), DEFAULT_TERM),
@@ -1174,8 +1195,8 @@ def get_sections(course_id):
                     'id': m['id'],
                     'term': normalize_term_value(m['term'], DEFAULT_TERM),
                     'day': m['day'],
-                    'start': m['start'],
-                    'end': m['end'],
+                    'start': m['start_time'],
+                    'end': m['end_time'],
                 }
                 for m in meetings
             ],

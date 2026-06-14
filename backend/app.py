@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -66,6 +67,7 @@ DEFAULT_TERM = 'Fall'
 TTB_BASE_URL = 'https://api.easi.utoronto.ca/ttb'
 TTB_COURSE_LOOKUP_URL = f'{TTB_BASE_URL}/getCoursesByCodeAndSectionCode'
 TTB_TIMEOUT_SECONDS = 12
+DB_CONNECT_TIMEOUT_SECONDS = int(os.environ.get('DB_CONNECT_TIMEOUT_SECONDS', '5'))
 COURSE_SUGGESTION_CACHE_TTL_SECONDS = 300
 MAX_COURSE_SUGGESTIONS = 100
 MAX_CALENDAR_SEARCH_PAGES = 6
@@ -113,6 +115,8 @@ TTB_TEACH_METHOD_MAP = {
     'TUT': 'Tutorial',
 }
 course_suggestion_cache = {}
+db_init_lock = threading.Lock()
+db_initialized = False
 
 
 @app.after_request
@@ -213,7 +217,11 @@ def get_db_connection():
             'Set it locally or have your hosting platform inject it before starting the app.'
         )
 
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    return psycopg.connect(
+        DATABASE_URL,
+        row_factory=dict_row,
+        connect_timeout=DB_CONNECT_TIMEOUT_SECONDS,
+    )
 
 
 def get_table_columns(conn, table_name):
@@ -307,6 +315,20 @@ def init_db():
         conn.commit()
     finally:
         conn.close()
+
+
+def ensure_db_initialized():
+    global db_initialized
+
+    if db_initialized:
+        return
+
+    with db_init_lock:
+        if db_initialized:
+            return
+
+        init_db()
+        db_initialized = True
 
 
 # Delete one user's saved courses and all related child records.
@@ -964,8 +986,6 @@ def lookup_course_suggestions(query, limit=MAX_COURSE_SUGGESTIONS):
     return suggestions
 
 
-init_db()
-
 # Redirect the root URL to the login screen.
 @app.route('/')
 def home():
@@ -974,15 +994,6 @@ def home():
 
 @app.route('/health')
 def health():
-    try:
-        conn = get_db_connection()
-        try:
-            conn.execute('SELECT 1').fetchone()
-        finally:
-            conn.close()
-    except Exception:
-        return {'status': 'error'}, 500
-
     return {'status': 'ok'}
 
 # Show the login page and create a session when credentials match.
@@ -992,6 +1003,7 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
+        ensure_db_initialized()
         conn = get_db_connection()
         user = conn.execute(
             'SELECT * FROM users WHERE username = %s',
@@ -1022,6 +1034,7 @@ def login():
             )
 
         if upgraded_password_hash:
+            ensure_db_initialized()
             conn = get_db_connection()
             conn.execute(
                 'UPDATE users SET password = %s WHERE id = %s',
@@ -1052,6 +1065,7 @@ def register():
                 )
             )
 
+        ensure_db_initialized()
         conn = get_db_connection()
         existing = conn.execute(
             'SELECT * FROM users WHERE username = %s',
@@ -1101,6 +1115,7 @@ def logout():
 def get_courses():
     if 'user_id' not in session:
         return {'error': 'Not logged in'}, 401
+    ensure_db_initialized()
     conn = get_db_connection()
     courses = conn.execute(
         'SELECT * FROM courses WHERE user_id = %s',
@@ -1126,6 +1141,7 @@ def save_courses():
     if error_message:
         return {'error': error_message}, 400
 
+    ensure_db_initialized()
     conn = get_db_connection()
     clear_saved_courses(conn, session['user_id'])
 
@@ -1167,6 +1183,7 @@ def get_sections(course_id):
     if 'user_id' not in session:
         return {'error': 'Not logged in'}, 401
 
+    ensure_db_initialized()
     conn = get_db_connection()
     owned_course = conn.execute(
         'SELECT id FROM courses WHERE id = %s AND user_id = %s',

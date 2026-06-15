@@ -25,16 +25,25 @@
               Plan a clean, conflict-free semester schedule
             </p>
           </div>
-        <button
-          id="logout-btn"
-          type="button"
-          class="secondary-button secondary-button--compact"
-        >
-          Logout
-        </button>
+          <div class="auth-controls">
+            <span id="auth-status" class="auth-status">Guest mode</span>
+            <button
+              id="auth-action-btn"
+              type="button"
+              class="secondary-button secondary-button--compact"
+            >
+              Login
+            </button>
+          </div>
         </div>
 
         <div class="sidebar-content">
+        <div
+          id="school-tabs"
+          class="school-tabs"
+          aria-label="Select school"
+        ></div>
+
         <div class="course-search-shell">
           <form id="add-course-form" class="course-form">
             <input

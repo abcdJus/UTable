@@ -7,6 +7,84 @@ function refreshAfterCourseChange() {
   updateMainView();
 }
 
+function applyLoadedTimetableState(stored = {}) {
+  const previousAuthState = {
+    isAuthenticated: state.isAuthenticated,
+    username: state.username,
+  };
+  const activeSchool = normalizeSchoolValue(stored.activeSchool, state.activeSchool);
+
+  state = {
+    courses: normalizeCourses(stored.courses, activeSchool),
+    activeSchool,
+    isAuthenticated: previousAuthState.isAuthenticated,
+    username: previousAuthState.username,
+    generatedSchedulesByTerm: createEmptyScheduleBuckets(),
+    sortedSchedulesByTerm: createEmptyScheduleBuckets(),
+    currentIndexesByTerm: createEmptyTermIndexes(),
+    hasGenerated: false,
+    activeTerm: normalizeTermValue(stored.activeTerm, TERMS[0]),
+    sortBy: stored.sortBy || 'default',
+  };
+
+  DOM.sortSelect.value = state.sortBy;
+  renderSchoolTabs();
+  updateAuthUI();
+  updateSchoolAwareCopy();
+  renderCourses();
+  updateMainView();
+
+  try {
+    writeLocalState(state.courses, state.sortBy, state.activeTerm, state.activeSchool);
+  } catch {
+    // Ignore storage failures
+  }
+}
+
+async function switchSchool(nextSchool) {
+  const normalizedSchool = normalizeSchoolValue(nextSchool, state.activeSchool);
+  if (normalizedSchool === state.activeSchool) return;
+
+  clearPendingSync();
+
+  try {
+    writeLocalState(state.courses, state.sortBy, state.activeTerm, state.activeSchool);
+  } catch {
+    // Ignore storage failures
+  }
+
+  closeCourseSuggestions();
+  closeCourseTermPicker();
+  setCourseSearchStatus(`Loading ${getSchoolLabel(normalizedSchool)} courses...`);
+
+  const previousSchool = state.activeSchool;
+  state.activeSchool = normalizedSchool;
+  state.courses = [];
+  resetGeneratedState();
+  renderSchoolTabs();
+  updateSchoolAwareCopy();
+  renderCourses();
+  updateMainView();
+
+  try {
+    const stored = await getCoursesBySchool(normalizedSchool);
+    applyLoadedTimetableState(stored);
+    const schoolLabel = getSchoolLabel(normalizedSchool);
+    setCourseSearchStatus(
+      normalizedSchool === 'mac' && state.courses.length === 0
+        ? 'McMaster mode is ready for saved course data, but live course search is not connected yet.'
+        : `Switched to ${schoolLabel}.`,
+      normalizedSchool === 'mac' && state.courses.length === 0 ? 'warning' : 'success',
+    );
+  } catch (error) {
+    console.error('School switch failed:', error);
+    state.activeSchool = previousSchool;
+    const stored = readStoredSchoolState(previousSchool);
+    applyLoadedTimetableState({ ...stored, activeSchool: previousSchool });
+    setCourseSearchStatus('Could not switch schools right now.', 'error');
+  }
+}
+
 let courseLookupInProgress = false;
 let courseSuggestionTimer = null;
 let courseSuggestionRequestId = 0;
@@ -248,7 +326,7 @@ function renderCourseSuggestions() {
           <span class="course-suggestion__main">
             <span class="course-suggestion__code">${escapeHtml(suggestion.code)}</span>
             <span class="course-suggestion__title">${escapeHtml(suggestion.title || '')}</span>
-            <span class="course-suggestion__campus">${escapeHtml(suggestion.campus || suggestion.campusLabel || 'U of T')}</span>
+            <span class="course-suggestion__campus">${escapeHtml(suggestion.campus || suggestion.campusLabel || getSchoolLabel(suggestion.school || state.activeSchool))}</span>
           </span>
           <span class="course-suggestion__meta">
             ${alreadyAdded ? 'Added' : 'Add'}
@@ -291,7 +369,7 @@ function showCourseSuggestionHint() {
   }
 
   renderCourseSuggestionStatus(
-    `Type at least ${COURSE_SUGGESTION_MIN_CHARS} characters to search U of T courses.`,
+    `Type at least ${COURSE_SUGGESTION_MIN_CHARS} characters to search ${getSchoolLabel(state.activeSchool)} courses.`,
   );
 }
 
@@ -307,22 +385,29 @@ function queueCourseSuggestions(query) {
   clearCourseSuggestionTimer();
   const requestId = ++courseSuggestionRequestId;
 
-  renderCourseSuggestionStatus(`Searching courses for "${normalizedQuery}"...`);
+  const requestSchool = state.activeSchool;
+  const requestSchoolLabel = getSchoolLabel(requestSchool);
+  renderCourseSuggestionStatus(
+    `Searching ${requestSchoolLabel} courses for "${normalizedQuery}"...`,
+  );
 
   courseSuggestionTimer = setTimeout(async () => {
     try {
-      const suggestions = await fetchCourseSuggestions(
+      const suggestionResult = await fetchCourseSuggestions(
         normalizedQuery,
         COURSE_SUGGESTION_LIMIT,
+        requestSchool,
       );
       if (requestId !== courseSuggestionRequestId || authRedirectInProgress) return;
 
+      const suggestions = suggestionResult.suggestions || [];
       courseSuggestions = suggestions;
       activeCourseSuggestionIndex = suggestions.length ? 0 : -1;
 
       if (!suggestions.length) {
         renderCourseSuggestionStatus(
-          `No U of T courses found for "${normalizedQuery}".`,
+          suggestionResult.message ||
+            `No ${requestSchoolLabel} courses found for "${normalizedQuery}".`,
         );
         return;
       }
@@ -365,12 +450,15 @@ async function addCourseByCode(rawCode) {
   }
 
   setCourseLookupPending(true);
-  setCourseSearchStatus(`Looking up ${code} in TTB...`, 'warning');
+  setCourseSearchStatus(
+    `Looking up ${code} in ${getSchoolLabel(state.activeSchool)} courses...`,
+    'warning',
+  );
 
   let releaseLookupInFinally = true;
 
   try {
-    const fetchedCourse = await searchCourseByCode(code);
+    const fetchedCourse = await searchCourseByCode(code, state.activeSchool);
     if (!fetchedCourse) return;
 
     if (!Array.isArray(fetchedCourse.sections) || fetchedCourse.sections.length === 0) {
@@ -413,6 +501,7 @@ async function addCourseByCode(rawCode) {
       filteredCourse.code || code,
       state.courses.length % COLORS.length,
       filteredCourse.sections,
+      state.activeSchool,
     );
 
     newCourse.expanded = true;
@@ -426,8 +515,9 @@ async function addCourseByCode(rawCode) {
   } catch (error) {
     if (!authRedirectInProgress) {
       console.error('Course lookup failed:', error);
+      const exampleCode = state.activeSchool === 'uoft' ? 'CSCB20H3' : 'CHEM 1A03';
       setCourseSearchStatus(
-        error.message || `Could not load "${code}". Try a full course code like CSCB20H3.`,
+        error.message || `Could not load "${code}". Try a full course code like ${exampleCode}.`,
         'error',
       );
     }
@@ -591,6 +681,7 @@ if (DOM.courseTermPicker) {
       filteredCourse.code || pendingCourseSelection.course.code,
       state.courses.length % COLORS.length,
       filteredCourse.sections,
+      state.activeSchool,
     );
 
     newCourse.expanded = true;
@@ -603,6 +694,40 @@ if (DOM.courseTermPicker) {
     );
     refreshAfterCourseChange();
     DOM.courseCodeInput.focus();
+  });
+}
+
+if (DOM.schoolTabs) {
+  DOM.schoolTabs.addEventListener('click', async (e) => {
+    const button = e.target.closest('[data-school]');
+    if (!button) return;
+
+    await switchSchool(button.getAttribute('data-school'));
+  });
+}
+
+if (DOM.authActionBtn) {
+  DOM.authActionBtn.addEventListener('click', async () => {
+    if (DOM.authActionBtn.disabled) return;
+
+    if (!state.isAuthenticated) {
+      window.location.href = '/login';
+      return;
+    }
+
+    const originalLabel = DOM.authActionBtn.textContent;
+    DOM.authActionBtn.disabled = true;
+    DOM.authActionBtn.textContent = 'Logging out...';
+
+    try {
+      await syncToBackend();
+      await logoutUser();
+      updateAuthUI();
+      setCourseSearchStatus('You are now using guest mode on this browser.', 'success');
+    } finally {
+      DOM.authActionBtn.disabled = false;
+      DOM.authActionBtn.textContent = state.isAuthenticated ? originalLabel : 'Login';
+    }
   });
 }
 
@@ -833,7 +958,13 @@ DOM.generateBtn.addEventListener('click', generateAlgorithm);
 
 // Replaces the current course list with the demo sample data.
 DOM.resetBtn.addEventListener('click', () => {
-  state.courses = buildSampleCourses();
+  const sampleCourses = buildSampleCourses(state.activeSchool);
+  if (!sampleCourses.length) {
+    setCourseSearchStatus('Sample data is only available for UofT right now.', 'warning');
+    return;
+  }
+
+  state.courses = sampleCourses;
   refreshAfterCourseChange();
 });
 
@@ -880,29 +1011,9 @@ if (DOM.termTabs) {
     updateMainView();
 
     try {
-      writeLocalState(state.courses, state.sortBy, state.activeTerm);
+      writeLocalState(state.courses, state.sortBy, state.activeTerm, state.activeSchool);
     } catch {
       // Ignore storage failures
-    }
-  });
-}
-
-// Logs the user out from the timetable page and prevents double-clicks while it runs.
-if (DOM.logoutBtn) {
-  DOM.logoutBtn.addEventListener('click', async () => {
-    if (DOM.logoutBtn.disabled) return;
-
-    const originalLabel = DOM.logoutBtn.textContent;
-    DOM.logoutBtn.disabled = true;
-    DOM.logoutBtn.textContent = 'Logging out...';
-
-    try {
-      await logoutUser();
-    } finally {
-      if (!authRedirectInProgress) {
-        DOM.logoutBtn.disabled = false;
-        DOM.logoutBtn.textContent = originalLabel;
-      }
     }
   });
 }

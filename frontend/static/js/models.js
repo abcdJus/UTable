@@ -26,7 +26,8 @@ function normalizeDraftSection(draftSection = {}, fallbackType = 'Lecture') {
 }
 
 // Normalizes one course record from storage or the backend into UI state.
-function normalizeCourse(course = {}, index = 0) {
+function normalizeCourse(course = {}, index = 0, school = DEFAULT_SCHOOL) {
+  const activeSchool = normalizeSchoolValue(school);
   const sections = Array.isArray(course.sections)
     ? course.sections.map((section) => normalizeSection(section))
     : [];
@@ -41,6 +42,7 @@ function normalizeCourse(course = {}, index = 0) {
 
   return {
     id: course.id != null ? String(course.id) : generateId(),
+    school: normalizeSchoolValue(course.school, activeSchool),
     code: String(course.code || '').trim().toUpperCase(),
     colorIndex: Number.isInteger(course.colorIndex)
       ? course.colorIndex
@@ -59,19 +61,24 @@ function normalizeCourse(course = {}, index = 0) {
 }
 
 // Normalizes the full course list and drops invalid blank entries.
-function normalizeCourses(courses = []) {
+function normalizeCourses(courses = [], school = DEFAULT_SCHOOL) {
+  const activeSchool = normalizeSchoolValue(school);
   return courses
-    .map((course, index) => normalizeCourse(course, index))
-    .filter((course) => course.code);
+    .map((course, index) => normalizeCourse(course, index, activeSchool))
+    .filter((course) => course.code && course.school === activeSchool);
 }
 
 // Builds the demo timetable set used by the "Load Sample Data" button.
-function buildSampleCourses() {
-  return SAMPLE_COURSES.map((course, index) =>
+function buildSampleCourses(school = DEFAULT_SCHOOL) {
+  const activeSchool = normalizeSchoolValue(school);
+  const sampleCourses = SAMPLE_COURSES_BY_SCHOOL[activeSchool] || [];
+
+  return sampleCourses.map((course, index) =>
     createCourse(
       course.code,
       course.colorIndex ?? index % COLORS.length,
       course.sections,
+      activeSchool,
     ),
   );
 }
@@ -79,6 +86,9 @@ function buildSampleCourses() {
 // Central frontend state shared by the UI, scheduler, and storage modules.
 let state = {
   courses: [],
+  activeSchool: DEFAULT_SCHOOL,
+  isAuthenticated: false,
+  username: '',
   generatedSchedulesByTerm: createEmptyScheduleBuckets(),
   sortedSchedulesByTerm: createEmptyScheduleBuckets(),
   currentIndexesByTerm: createEmptyTermIndexes(),

@@ -46,6 +46,22 @@ function normalizeTermValue(value, fallback = TERMS[0]) {
   return TERMS.includes(value) ? value : fallback;
 }
 
+// Keeps school values limited to supported course providers.
+function normalizeSchoolValue(value, fallback = DEFAULT_SCHOOL) {
+  const normalized = String(value || '').trim().toLowerCase();
+  const school = SCHOOL_OPTIONS.some((option) => option.id === normalized)
+    ? normalized
+    : fallback;
+
+  return SCHOOL_OPTIONS.some((option) => option.id === school)
+    ? school
+    : DEFAULT_SCHOOL;
+}
+
+function getSchoolLabel(school = DEFAULT_SCHOOL) {
+  return SCHOOL_LABELS[normalizeSchoolValue(school)] || SCHOOL_LABELS[DEFAULT_SCHOOL];
+}
+
 // Builds a per-term object so each semester can keep independent state.
 function createTermMap(createValue) {
   return Object.fromEntries(
@@ -98,13 +114,16 @@ function createDraftSection(type = 'Lecture') {
 }
 
 // Creates one course object in the frontend format the app expects.
-function createCourse(code, colorIndex = 0, sections = []) {
+function createCourse(code, colorIndex = 0, sections = [], school = DEFAULT_SCHOOL) {
   const normalizedSections = Array.isArray(sections)
     ? sections.map((section) => normalizeSection(section))
     : [];
+  const activeSchool =
+    typeof state === 'object' ? normalizeSchoolValue(state.activeSchool) : DEFAULT_SCHOOL;
 
   return {
     id: generateId(),
+    school: normalizeSchoolValue(school, activeSchool),
     code: String(code || '').trim().toUpperCase(),
     colorIndex: Number.isInteger(colorIndex) ? colorIndex : 0,
     expanded: false,

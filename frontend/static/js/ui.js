@@ -150,6 +150,60 @@ function renderTermTabs() {
   DOM.termTabs.classList.remove('is-hidden');
 }
 
+function renderSchoolTabs() {
+  if (!DOM.schoolTabs) return;
+
+  DOM.schoolTabs.innerHTML = SCHOOL_OPTIONS
+    .map((school) => {
+      const isActive = normalizeSchoolValue(state.activeSchool) === school.id;
+
+      return `
+        <button
+          type="button"
+          class="school-tab${isActive ? ' school-tab--active' : ''}"
+          data-school="${school.id}"
+          aria-pressed="${isActive ? 'true' : 'false'}"
+        >
+          ${escapeHtml(school.label)}
+        </button>
+      `;
+    })
+    .join('');
+}
+
+function updateAuthUI() {
+  if (DOM.authStatus) {
+    DOM.authStatus.textContent = state.isAuthenticated
+      ? `Signed in as ${state.username || 'account'}`
+      : 'Guest mode';
+  }
+
+  if (DOM.authActionBtn) {
+    DOM.authActionBtn.textContent = state.isAuthenticated ? 'Logout' : 'Login';
+    DOM.authActionBtn.title = state.isAuthenticated
+      ? 'Log out of your account'
+      : 'Log in to save under your account';
+  }
+}
+
+function updateSchoolAwareCopy() {
+  const activeSchoolLabel = getSchoolLabel(state.activeSchool);
+
+  if (DOM.courseCodeInput) {
+    DOM.courseCodeInput.placeholder =
+      state.activeSchool === 'uoft'
+        ? 'Course Code (e.g. CSCB20H3)'
+        : 'Course Code (e.g. CHEM 1A03)';
+  }
+
+  if (DOM.courseSuggestions) {
+    DOM.courseSuggestions.setAttribute(
+      'aria-label',
+      `${activeSchoolLabel} course suggestions`,
+    );
+  }
+}
+
 // Builds the HTML for the editable meeting rows inside a draft section.
 function renderDraftMeetings(course, draft, scope) {
   return draft.meetings
@@ -287,7 +341,8 @@ function renderCourses() {
   if (state.courses.length === 0) {
     DOM.courseList.innerHTML = `
       <div class="course-list-empty">
-        No courses added yet. Start by adding a course code above.
+        No ${escapeHtml(getSchoolLabel(state.activeSchool))} courses added yet.
+        Start by adding a course code above.
       </div>
     `;
     DOM.generateBtn.disabled = true;

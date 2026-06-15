@@ -8,9 +8,14 @@
 <body class="auth-page">
 <div class="auth-shell">
     <div class="auth-card">
-    <button type="button" onclick="window.location.href='/login'" class="secondary-button secondary-button--compact auth-back-button">
-        Back to Login
-    </button>
+    <div class="auth-header-actions">
+        <button type="button" onclick="window.location.href='/login'" class="secondary-button secondary-button--compact">
+            Back to Login
+        </button>
+        <button type="button" onclick="window.location.href='/'" class="secondary-button secondary-button--compact">
+            Continue as guest
+        </button>
+    </div>
     <h2 class="auth-title">Thank you for Registering</h2>
     <p class="auth-subtitle">Please provide the following information to register:</p>
     {% if message %}

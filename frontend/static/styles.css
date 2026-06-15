@@ -269,9 +269,16 @@ button {
   flex-direction: column;
 }
 
-.auth-back-button {
-  align-self: flex-start;
+.auth-back-button,
+.auth-header-actions {
   margin-bottom: 1rem;
+}
+
+.auth-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .auth-title {
@@ -357,6 +364,10 @@ button {
   color: var(--text-muted);
 }
 
+.auth-guest-button {
+  margin-top: 1rem;
+}
+
 .builder-page {
   height: 100vh;
   overflow: hidden;
@@ -420,6 +431,23 @@ button {
   max-width: 20rem;
 }
 
+.auth-controls {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+
+.auth-status {
+  max-width: 11rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
 .sidebar-content {
   flex: 1;
   min-height: 0;
@@ -437,6 +465,39 @@ button {
   padding-top: 1rem;
   border-top: 1px solid var(--surface-border-soft);
   background: var(--panel-background);
+}
+
+.school-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0.35rem;
+  border-radius: 1rem;
+  background: var(--surface-background);
+  border: 1px solid var(--surface-border);
+}
+
+.school-tab {
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.8rem;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  font-weight: 800;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.school-tab:hover {
+  color: var(--text-strong);
+  background: var(--panel-background);
+}
+
+.school-tab--active {
+  background: var(--primary-button-background);
+  color: var(--primary-button-text);
+  box-shadow: 0 8px 18px rgba(51, 103, 214, 0.18);
 }
 
 .course-form {
@@ -1420,6 +1481,21 @@ button {
 
   .auth-footer .secondary-button {
     width: 100%;
+  }
+
+  .sidebar-header {
+    flex-direction: column;
+  }
+
+  .auth-controls {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .auth-status {
+    text-align: left;
   }
 
   .course-form {

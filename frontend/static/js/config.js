@@ -8,8 +8,17 @@ const GRID_END_HOUR = 21;
 const HOUR_HEIGHT = 64;
 const GRID_HEIGHT = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_HEIGHT;
 const STORAGE_KEY = 'timetable-builder-upgraded-v1';
+const GUEST_COOKIE_NAME = 'utable_guest';
 const COURSE_SUGGESTION_MIN_CHARS = 2;
 const COURSE_SUGGESTION_LIMIT = 100;
+const DEFAULT_SCHOOL = 'uoft';
+const SCHOOL_OPTIONS = [
+  { id: 'uoft', label: 'UofT', fullLabel: 'University of Toronto' },
+  { id: 'mac', label: 'Mac', fullLabel: 'McMaster University' },
+];
+const SCHOOL_LABELS = Object.fromEntries(
+  SCHOOL_OPTIONS.map((school) => [school.id, school.fullLabel]),
+);
 
 const DOM = {
   courseList: document.getElementById('course-list'),
@@ -18,6 +27,9 @@ const DOM = {
   courseSuggestions: document.getElementById('course-suggestions'),
   courseSearchStatus: document.getElementById('course-search-status'),
   courseTermPicker: document.getElementById('course-term-picker'),
+  schoolTabs: document.getElementById('school-tabs'),
+  authStatus: document.getElementById('auth-status'),
+  authActionBtn: document.getElementById('auth-action-btn'),
   generateBtn: document.getElementById('generate-btn'),
   generateHelp: document.getElementById('generate-help'),
   resetBtn: document.getElementById('reset-btn'),
@@ -41,98 +53,100 @@ const DOM = {
   timetableContainer: document.getElementById('timetable-container'),
   courseCount: document.getElementById('course-count'),
   sectionCount: document.getElementById('section-count'),
-  logoutBtn: document.getElementById('logout-btn'),
 };
 
-const SAMPLE_COURSES = [
-  {
-    code: 'CSCA08',
-    colorIndex: 0,
-    sections: [
-      {
-        type: 'Lecture',
-        label: 'LEC01',
-        meetings: [
-          { term: 'Fall', day: 'Mon', start: '09:00', end: '11:00' },
-          { term: 'Fall', day: 'Wed', start: '09:00', end: '10:00' },
-        ],
-      },
-      {
-        type: 'Lecture',
-        label: 'LEC02',
-        meetings: [
-          { term: 'Fall', day: 'Tue', start: '13:00', end: '15:00' },
-          { term: 'Fall', day: 'Thu', start: '13:00', end: '14:00' },
-        ],
-      },
-      {
-        type: 'Tutorial',
-        label: 'TUT01',
-        meetings: [{ term: 'Fall', day: 'Fri', start: '10:00', end: '11:00' }],
-      },
-      {
-        type: 'Tutorial',
-        label: 'TUT02',
-        meetings: [{ term: 'Fall', day: 'Thu', start: '15:00', end: '16:00' }],
-      },
-    ],
-  },
-  {
-    code: 'MATA31',
-    colorIndex: 1,
-    sections: [
-      {
-        type: 'Lecture',
-        label: 'LEC01',
-        meetings: [
-          { term: 'Winter', day: 'Mon', start: '11:00', end: '13:00' },
-          { term: 'Winter', day: 'Wed', start: '11:00', end: '12:00' },
-        ],
-      },
-      {
-        type: 'Lecture',
-        label: 'LEC02',
-        meetings: [
-          { term: 'Winter', day: 'Tue', start: '09:00', end: '11:00' },
-          { term: 'Winter', day: 'Thu', start: '09:00', end: '10:00' },
-        ],
-      },
-      {
-        type: 'Practical',
-        label: 'PRA01',
-        meetings: [{ term: 'Winter', day: 'Fri', start: '09:00', end: '10:00' }],
-      },
-      {
-        type: 'Practical',
-        label: 'PRA02',
-        meetings: [{ term: 'Winter', day: 'Wed', start: '14:00', end: '15:00' }],
-      },
-    ],
-  },
-  {
-    code: 'STAB52',
-    colorIndex: 2,
-    sections: [
-      {
-        type: 'Lecture',
-        label: 'LEC01',
-        meetings: [{ term: 'Fall', day: 'Tue', start: '11:00', end: '13:00' }],
-      },
-      {
-        type: 'Lecture',
-        label: 'LEC02',
-        meetings: [{ term: 'Fall', day: 'Thu', start: '11:00', end: '13:00' }],
-      },
-      {
-        type: 'Tutorial',
-        label: 'TUT01',
-        meetings: [{ term: 'Fall', day: 'Fri', start: '11:00', end: '12:00' }],
-      },
-      {
-        type: 'Tutorial',
-        label: 'TUT02',
-        meetings: [{ term: 'Fall', day: 'Wed', start: '15:00', end: '16:00' }],
-      },
-    ],
-  },
-];
+const SAMPLE_COURSES_BY_SCHOOL = {
+  uoft: [
+    {
+      code: 'CSCA08',
+      colorIndex: 0,
+      sections: [
+        {
+          type: 'Lecture',
+          label: 'LEC01',
+          meetings: [
+            { term: 'Fall', day: 'Mon', start: '09:00', end: '11:00' },
+            { term: 'Fall', day: 'Wed', start: '09:00', end: '10:00' },
+          ],
+        },
+        {
+          type: 'Lecture',
+          label: 'LEC02',
+          meetings: [
+            { term: 'Fall', day: 'Tue', start: '13:00', end: '15:00' },
+            { term: 'Fall', day: 'Thu', start: '13:00', end: '14:00' },
+          ],
+        },
+        {
+          type: 'Tutorial',
+          label: 'TUT01',
+          meetings: [{ term: 'Fall', day: 'Fri', start: '10:00', end: '11:00' }],
+        },
+        {
+          type: 'Tutorial',
+          label: 'TUT02',
+          meetings: [{ term: 'Fall', day: 'Thu', start: '15:00', end: '16:00' }],
+        },
+      ],
+    },
+    {
+      code: 'MATA31',
+      colorIndex: 1,
+      sections: [
+        {
+          type: 'Lecture',
+          label: 'LEC01',
+          meetings: [
+            { term: 'Winter', day: 'Mon', start: '11:00', end: '13:00' },
+            { term: 'Winter', day: 'Wed', start: '11:00', end: '12:00' },
+          ],
+        },
+        {
+          type: 'Lecture',
+          label: 'LEC02',
+          meetings: [
+            { term: 'Winter', day: 'Tue', start: '09:00', end: '11:00' },
+            { term: 'Winter', day: 'Thu', start: '09:00', end: '10:00' },
+          ],
+        },
+        {
+          type: 'Practical',
+          label: 'PRA01',
+          meetings: [{ term: 'Winter', day: 'Fri', start: '09:00', end: '10:00' }],
+        },
+        {
+          type: 'Practical',
+          label: 'PRA02',
+          meetings: [{ term: 'Winter', day: 'Wed', start: '14:00', end: '15:00' }],
+        },
+      ],
+    },
+    {
+      code: 'STAB52',
+      colorIndex: 2,
+      sections: [
+        {
+          type: 'Lecture',
+          label: 'LEC01',
+          meetings: [{ term: 'Fall', day: 'Tue', start: '11:00', end: '13:00' }],
+        },
+        {
+          type: 'Lecture',
+          label: 'LEC02',
+          meetings: [{ term: 'Fall', day: 'Thu', start: '11:00', end: '13:00' }],
+        },
+        {
+          type: 'Tutorial',
+          label: 'TUT01',
+          meetings: [{ term: 'Fall', day: 'Fri', start: '11:00', end: '12:00' }],
+        },
+        {
+          type: 'Tutorial',
+          label: 'TUT02',
+          meetings: [{ term: 'Fall', day: 'Wed', start: '15:00', end: '16:00' }],
+        },
+      ],
+    },
+  ],
+  mac: [],
+};
